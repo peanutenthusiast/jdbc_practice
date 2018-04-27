@@ -7,39 +7,47 @@ import org.springframework.boot.CommandLineRunner;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.jdbc.core.JdbcTemplate;
-import java.util.*;
+
+import java.util.Arrays;
+import java.util.List;
 import java.util.stream.Collectors;
 
 @SpringBootApplication
 public class Application implements CommandLineRunner {
-  private static final Logger log = LoggerFactory.getLogger(Application.class);
 
-  public static void main(String args[]) {
-    SpringApplication.run(Application.class, args);
-  }
+    private static final Logger log = LoggerFactory.getLogger(Application.class);
 
-  @Autowired
-  JdbcTemplate jdbcTemplate;
+    public static void main(String args[]) {
+        SpringApplication.run(Application.class, args);
+    }
 
-  @Override
-  public void run(String... strings) throws Exception {
+    @Autowired
+    JdbcTemplate jdbcTemplate;
 
-    log.info("Creating tables");
+    @Override
+    public void run(String... strings) throws Exception {
 
-    jdbcTemplate.execute("DROP TABLE customers IF EXISTS");
-    jdbcTemplate.execute("CREATE TABLE customers(" + "id SERIAL, first_name VARCHAR(255), last_name VARCHAR(255)");
+        log.info("Creating tables");
 
-    List<Object[]> splitUpNames = Arrays.asList("John Woo", "Jeff Dean", "Kali Uchis").stream()
-      .map(name -> name.split(" "))
-      .collect(Collectors.toList());
+        jdbcTemplate.execute("DROP TABLE customers IF EXISTS");
+        jdbcTemplate.execute("CREATE TABLE customers(" +
+                "id SERIAL, first_name VARCHAR(255), last_name VARCHAR(255))");
 
-    splitUpNames.forEach(name -> log.info(String.format("Inserting customer record for %s %s", name[0], name[1])));
+        // Split up the array of whole names into an array of first/last names
+        List<Object[]> splitUpNames = Arrays.asList("John Woo", "Jeff Dean", "Josh Bloch", "Josh Long").stream()
+                .map(name -> name.split(" "))
+                .collect(Collectors.toList());
 
-    log.info("Querying for customer records where first_name = 'JOSH'");
+        // Use a Java 8 stream to print out each tuple of the list
+        splitUpNames.forEach(name -> log.info(String.format("Inserting customer record for %s %s", name[0], name[1])));
 
-    jdbcTemplate.query(
-      "SELECT id, first_name, last_name FROM customers WHERE first_name = ?", new Object[] { "Kali" },
-      (rs, rowNum) -> new Customer(rs.getLong("id"), rs.getString("first_name"), rs.getString("last_name"))
-    ).forEach(customer -> log.info(customer.toString()));
-  }
+        // Uses JdbcTemplate's batchUpdate operation to bulk load data
+        jdbcTemplate.batchUpdate("INSERT INTO customers(first_name, last_name) VALUES (?,?)", splitUpNames);
+
+        log.info("Querying for customer records where first_name = 'Josh':");
+        jdbcTemplate.query(
+                "SELECT id, first_name, last_name FROM customers WHERE first_name = ?", new Object[] { "Josh" },
+                (rs, rowNum) -> new Customer(rs.getLong("id"), rs.getString("first_name"), rs.getString("last_name"))
+        ).forEach(customer -> log.info(customer.toString()));
+    }
 }
